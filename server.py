@@ -1,69 +1,117 @@
 import sys
 import socket
 import threading
+import time
+from random import randint
 
 class Server:
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	conns = []
+	peers = []
 	def __init__(self):
-		self.sock.bind(('0.0.0.0', 8888))
-		self.sock.listen(1)
+		# Instantiate socket
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		# Reuse socket
+		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		sock.bind(('0.0.0.0', 8888))
+		sock.listen(1)
+		print("Server running ...")
 
-	def handler(self, conn, addr, conns):
+		while True:
+			conn, addr = sock.accept()
+
+			# Threads for multiple connections
+			conn_thread = threading.Thread(
+				target=self.handler,
+				args=(conn, addr),
+				daemon=True) # close on program exit
+
+			# Begin session
+			conn_thread.start()
+			self.conns.append(conn)
+			self.peers.append(addr[0]) # Peer address
+			print('{}:{} connected'.format(addr[0], addr[1]))
+			self.sendPeersList()
+
+	def handler(self, conn, addr):
 		while True:
 			# Handle messages
 			data = conn.recv(1024)
-			for c in conns:
+			for c in self.conns:
 				c.send(bytes(data))
 
 			# Remove disconnected
 			if not data:
 				print('{}:{} disconnected'.format(addr[0], addr[1]))
 				self.conns.remove(conn)
+				self.peers.remove(addr[0])
 				conn.close()
+				self.sendPeersList() # Update peers list of server connections
 				break
 
-	def run(self):
-		while True:
-			conn, addr = self.sock.accept()
-			# Threads for multiple connections
-			conn_thread = threading.Thread(
-				target=self.handler,
-				args=(conn, addr, self.conns),
-				daemon=True) # close on program exit
-
-			# Begin session
-			conn_thread.start()
-			self.conns.append(conn)
-			print('{}:{} connected'.format(addr[0], addr[1]))
+	# Send list of peers
+	def sendPeersList(self):
+		peers_lst = [str(peer) for peer in self.peers]
+		peers_str = ','.join(peers_lst)
+		for c in self.conns:
+			c.send(b'\x11' + bytes(peers_str, 'utf-8'))
 
 class Client:
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 	def __init__(self, address):
-		self.sock.connect((address, 8888))
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.connect((address, 8888))
+
 		# Send Data (background)
 		cli_thread = threading.Thread(
-			target=self.send,
+			target=self.sendMessage,
+			args=(sock,),
 			daemon=True)
 		cli_thread.start()
 
 		# Receive Data
 		while True:
-			data = self.sock.recv(1024)
+			data = sock.recv(1024)
 			if not data:
 				break
-			print(str(data, 'utf-8'))
+			if data[0:1] == b'\x11':
+				print('Got peers list:', data[1:])
+				self.updateAllPeers(data[1:])
+			else:
+				print(str(data, 'utf-8'))
 
-	def send(self):
+	def sendMessage(self, sock):
 		# Raw encode
 		while True:
-			self.sock.send(bytes(input(""), 'utf-8'))
+			sock.send(bytes(input(""), 'utf-8'))
+
+	def updateAllPeers(self, peers_str):
+		P2P.peers = str(peers_str, 'utf-8').split(',')[:-1]
+
+class P2P:
+	peers = ['127.0.0.1']
 
 if __name__ == '__main__':
-	# Run as server or client
-	if len(sys.argv) > 1:
-		client = Client(sys.argv[1])
-	else:
-		server = Server()
-		server.run()
+	# When a server loses connection, randomly pick a client
+	while True:
+		try:
+			print("Trying to connect ...")
+			time.sleep(randint(1,5))
+
+			for peer in P2P.peers:
+				# Try to connect
+				try:
+					client = Client(peer)
+				except KeyboardInterrupt:
+					sys.exit(0)
+				except:
+					pass
+
+				try:
+					# Become the server
+					server = Server()
+				except KeyboardInterrupt:
+					sys.exit(0)
+				except:
+					print("Failed to start server.")
+
+		except KeyboardInterrupt: # ctrl c
+			sys.exit(0)
