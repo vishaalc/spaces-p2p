@@ -4,6 +4,10 @@ import threading
 import time
 from random import randint
 
+class P2P:
+	peers = ['127.0.0.1']
+
+
 class Server:
 	conns = []
 	peers = []
@@ -12,6 +16,7 @@ class Server:
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		# Reuse socket
 		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 		sock.bind(('0.0.0.0', 8888))
 		sock.listen(1)
 		print("Server running ...")
@@ -28,7 +33,9 @@ class Server:
 			# Begin session
 			conn_thread.start()
 			self.conns.append(conn)
-			self.peers.append(addr[0]) # Peer address
+
+			# Track peer addresses
+			P2P.peers.append(addr[0])
 			print('{}:{} connected'.format(addr[0], addr[1]))
 			self.sendPeersList()
 
@@ -43,17 +50,19 @@ class Server:
 			if not data:
 				print('{}:{} disconnected'.format(addr[0], addr[1]))
 				self.conns.remove(conn)
-				self.peers.remove(addr[0])
+				P2P.peers.remove(addr[0])
 				conn.close()
-				self.sendPeersList() # Update peers list of server connections
+				# Update server connections
+				self.sendPeersList()
 				break
 
 	# Send list of peers
 	def sendPeersList(self):
-		peers_lst = [str(peer) for peer in self.peers]
+		peers_lst = [str(peer) for peer in P2P.peers]
 		peers_str = ','.join(peers_lst)
 		for c in self.conns:
 			c.send(b'\x11' + bytes(peers_str, 'utf-8'))
+
 
 class Client:
 	def __init__(self, address):
@@ -72,6 +81,8 @@ class Client:
 			data = sock.recv(1024)
 			if not data:
 				break
+
+			# If peer list
 			if data[0:1] == b'\x11':
 				print('Got peers list:', data[1:])
 				self.updateAllPeers(data[1:])
@@ -86,8 +97,6 @@ class Client:
 	def updateAllPeers(self, peers_str):
 		P2P.peers = str(peers_str, 'utf-8').split(',')[:-1]
 
-class P2P:
-	peers = ['127.0.0.1']
 
 if __name__ == '__main__':
 	# When a server loses connection, randomly pick a client
@@ -105,13 +114,13 @@ if __name__ == '__main__':
 				except:
 					pass
 
+				# Become the server
 				try:
-					# Become the server
 					server = Server()
 				except KeyboardInterrupt:
 					sys.exit(0)
 				except:
 					print("Failed to start server.")
 
-		except KeyboardInterrupt: # ctrl c
+		except KeyboardInterrupt:
 			sys.exit(0)
