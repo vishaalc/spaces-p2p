@@ -1,0 +1,17 @@
+{
+  "name": "simple-signal-wrtc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "budo index.js",
+    "signalhub": "signalhub listen -p 8080"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "budo": "^11.6.4",
+    "simple-peer": "^9.9.3"
+  }
+}
