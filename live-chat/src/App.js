@@ -6,6 +6,7 @@ import React, {
 import './App.css';
 import useInput from './useInput.js';
 import PubNub from 'pubnub';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Card,
   CardActions,
@@ -16,6 +17,8 @@ import {
   Typography,
   Input
 } from '@material-ui/core';
+import DeleteOutlineIcon from '@material-ui/icons/DeleteOutline';
+import BlockIcon from '@material-ui/icons/Block';
 
 function App() {
   // Set states
@@ -40,13 +43,14 @@ function App() {
     pubnub.addListener({
       status: (statusEvent) => {
         if (statusEvent.category === "PNConnectedCategory") {
-          console.log("Connected to PubNub!")
+          console.log("Connected to PubNub")
         }
       },
       message: (msg) => {
         if (msg.message.text) {
           let newMessages = [];
           newMessages.push({
+            msgId: msg.message.msgId,
             uuid: msg.message.uuid,
             text: msg.message.text
           });
@@ -63,12 +67,13 @@ function App() {
     // Fetch history
     pubnub.history({
       channel: channel,
-      count: 10, // default 100
+      count: 20, // default 100
       stringifiedTimeToken: true // default false
     }, (status, response) => {
       let newMessages = [];
       for (let i = 0; i < response.messages.length; i++) {
         newMessages.push({
+          msgId: response.messages[i].entry.msgId,
           uuid: response.messages[i].entry.uuid,
           text: response.messages[i].entry.text
         });
@@ -78,7 +83,7 @@ function App() {
 
     // End
     return () => {
-      console.log("Shutting down pubnub");
+      console.log("Shutting down PubNub");
       pubnub.unsubscribeAll();
       setMessages([]);
     }
@@ -97,17 +102,38 @@ function App() {
   function publishMessage() {
     if (chatMessage.value) {
       let messageObject = {
+        msgId: uuidv4(),
+        uuid: username,
         text: chatMessage.value,
-        uuid: username
       };
 
       pubnub.publish({
         message: messageObject,
         channel: channel
+      }, (status, response) => {
+        if (!status.error) {
+          // firestore msgId with rtt
+        } else {
+          console.log("Failed to publish")
+        }
       });
 
       chatMessage.setValue('');
     }
+  }
+
+  // Delete a message
+  function deleteMessage() {
+    // on click of message
+    // look up msgId and get timetoken
+    let timetoken = "";
+    pubnub.deleteMessages({
+      channel: channel,
+      start: String(timetoken - 1),
+      end: String(timetoken),
+    }, (result) => {
+      console.log(result);
+    })
   }
 
   // Create page component
@@ -152,8 +178,8 @@ function Log(props) {
     <List component="nav">
       <ListItem>
       <Typography component="div">
-        { props.messages.map((item, index)=>(
-          <Message key={index} uuid={item.uuid} text={item.text}/>
+        { props.messages.map((item, index) => (
+          <Message key={index} id={item.msgId} uuid={item.uuid} text={item.text}/>
         )) }
       </Typography>
       </ListItem>
@@ -162,10 +188,18 @@ function Log(props) {
 };
 
 // Message component
-function Message(props){
+function Message(props){  
   return (
-    <div >
+    <div messageid={ props.id } >
       { props.uuid }: { props.text }
+      <BlockIcon
+        style={{float: 'right'}}
+        onClick={() => { console.log('Block ' + props.uuid) }}
+      />
+      <DeleteOutlineIcon
+        style={{float:'right'}}
+        onClick={() => { console.log('Delete ' + props.id) }}
+      />
     </div>
   );
 }
