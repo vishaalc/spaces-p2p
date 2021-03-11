@@ -2,8 +2,10 @@ const http = require("http");
 const express = require("express");
 const { ExpressPeerServer } = require("peer");
 const Websocket = require("ws");
+const dotenv = require("dotenv");
 
-process.title = "muse-peer-server";
+dotenv.config();
+process.title = "muse-p2p-server";
 
 const PEERJS_PORT = process.env.PEERJS_PORT || 3001;
 const app = express();
@@ -11,8 +13,8 @@ app.set("port", PEERJS_PORT);
 app.get("/", (req, res, next) => res.send("Lorem ipsum"));
 
 // Signal peer ids
-const server = http.createServer(app);
-const peerServer = ExpressPeerServer(server, {
+const httpServer = http.createServer(app);
+const peerServer = ExpressPeerServer(httpServer, {
   allow_discovery: true,
   debug: true,
 });
@@ -28,10 +30,11 @@ peerServer.on("disconnect", (client) => {
 });
 
 // Websocket listen
-const WS_PORT = process.env.WS_PORT || 3002;
+const WS_PORT = process.env.WS_PORT || 3002
 const wsServer = new Websocket.Server({
-  httpServer: server,
+  server: httpServer,
   port: WS_PORT,
+  // path: "/socket",
 });
 
 wsServer.on("connection", (socket) => {
@@ -41,6 +44,5 @@ wsServer.on("connection", (socket) => {
   });
 });
 
-server.listen(PEERJS_PORT);
-console.log(`Peer server running @ http://localhost:${PEERJS_PORT}/signal`);
-console.log(`Websocket server running @ ws://localhost:${WS_PORT}`);
+httpServer.listen(PEERJS_PORT);
+console.log("Peer server running @ http://localhost:", PEERJS_PORT);
