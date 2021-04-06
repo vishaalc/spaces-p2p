@@ -8,8 +8,8 @@ process.title = "muse-p2p-server";
 
 // Get config
 dotenv.config();
-const PEERJS_PORT = process.env.PEERJS_PORT || 3001;
-const WS_PORT = process.env.WS_PORT || 3002
+const PEERJS_PORT = process.env.PEERJS_PORT || 8080;
+const WS_PORT = process.env.WS_PORT || 8081
 
 const app = express();
 app.get("/", (req, res, next) => res.send("Lorem ipsum"));
@@ -38,14 +38,14 @@ const wsServer = new Websocket.Server({
   port: WS_PORT,
 });
 
-// Websocket listen
+// Listen for new peers
 wsServer.on("connection", (socket) => {
-  // Send new peer ID
   socket.on("message", (peer) => {
     socket.send(peer);
   });
 });
 
 // Start server
-httpServer.listen(PEERJS_PORT);
-console.log("Peer server running @ http://localhost:", PEERJS_PORT);
+httpServer.listen(PEERJS_PORT, () => {
+  console.log("Peer server running @ http://localhost:", PEERJS_PORT);
+});
