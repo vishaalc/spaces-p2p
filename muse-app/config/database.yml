@@ -1,0 +1,23 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV["DB_POOL"] || 5  %>
+  database: <%= ENV['DB_NAME'] || 'muse_app_development' %>
+  username: <%= ENV['DB_USER'] || ENV['USER'] %>
+  password: <%= ENV['DB_PASS'] %>
+  host: <%= ENV["DB_HOST"] %>
+  url: <%= ENV['DATABASE_URL'] %> # takes higher precedence than other settings
+  reconnect: true
+
+development:
+  <<: *default
+  database: <%= ENV['DB_NAME'] || 'muse_app_development' %>
+
+test:
+  <<: *default
+  database: muse_app_test
+
+production:
+  <<: *default
+  database: muse_app_production
+  url: <%= ENV['DATABASE_URL'] %>
